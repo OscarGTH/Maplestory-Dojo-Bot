@@ -1,4 +1,3 @@
-from email.mime import image
 import json
 import os
 import queue
