@@ -567,6 +567,7 @@ class MainApplication(tk.Frame):
                 # Writing dictionary into JSON file.
                 with open(file_name, 'w') as f:
                     json.dump(self.configuration, f, indent=4, sort_keys=True)
+                self.check_configuration()
             else:
                 # Setting config name error
                 self.set_elem_error(config_name_elem)

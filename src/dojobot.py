@@ -411,7 +411,7 @@ class DojoBot(threading.Thread):
 
         try:
             # Iterate through every stage
-            self.log("Detecting current stage...")
+            self.log("Detecting current stage...", "debug")
             for stage in range(-2, self.configuration['stage_limit'] + 2):
                 if pg.locateOnScreen('images/stage_' + str(stage) + '.png', grayscale=True, region = MAP_NAME_REGION):
                     self.log("Detected stage: " + str(stage), "debug")
@@ -421,8 +421,8 @@ class DojoBot(threading.Thread):
                     # Set global var to mark the stage.
                     current_stage = stage
                     return stage
-        except Exception:
-            self.log("Error while detecting stage!", "debug")
+        except Exception as ex:
+            self.log(ex, "debug")
 
     def run(self):
         # Activating game window
