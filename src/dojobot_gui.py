@@ -51,7 +51,7 @@ class MainApplication(tk.Frame):
         # Setting window title
         self.parent.title("DojoBeater")
         # Adding custom cursor
-        self.parent.configure(cursor = "@" + "MapleCursor.ani")
+        self.parent.configure(cursor = "@MapleCursor.ani")
 
         # Adding background image 
         # Add image file
