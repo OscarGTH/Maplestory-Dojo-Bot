@@ -8,7 +8,6 @@ import pydirectinput as pd
 import time
 import datetime
 import pygetwindow as gw
-from helper_constants import STAGE_NAMES
 from logzero import logger
 
 # Tuple for setting the region where map name should be detected from.
@@ -28,6 +27,7 @@ prev_attack_direction = ""
 # Used to contain the run start time in UNIX format
 start_time = 0
 run_time = 0
+current_channel = 1
 
 class DojoBot(threading.Thread):
 
@@ -39,7 +39,7 @@ class DojoBot(threading.Thread):
             if not self.sc_mode:
                 self.configuration = master.configuration
                 self.set_up_conf()
-                self.run_stats = {'reached_end': False, 'run_count': 0}
+                self.run_stats = {'reached_end': False, 'run_count': 0, 'bursted_stages': []}
                 
     def set_up_conf(self):
         """ Checks configuration and sets values to default if they're missing. """
@@ -80,6 +80,7 @@ class DojoBot(threading.Thread):
         """ Handles main logic of botting run. """
         self.log("Beginning botting actions.", "info")
         monster_has_been_alive = False
+        stage_timer = 0
         try:
             while current_stage <= self.configuration['stage_limit'] + 1:
                 time.sleep(0.75)
@@ -89,6 +90,8 @@ class DojoBot(threading.Thread):
                     # then player is probably in new map.
                     if prev_stage < current_stage:
                         self.log("Detected a new stage.", "debug")
+                        # Setting stage timer as epoch current time
+                        stage_timer = time.time()
                         self.walk_to_attack_position()
                         monster_has_been_alive = False
                     else:
@@ -101,7 +104,7 @@ class DojoBot(threading.Thread):
                             attack_counter = 0
                             # When monster is alive, player should attack it.
                             while(monster_alive):
-                                self.perform_basic_attack(1.2)
+                                self.perform_basic_attack()
                                 attack_counter += 1
                                 # Check if monster is alive.
                                 monster_alive = self.monster_is_alive()
@@ -129,6 +132,14 @@ class DojoBot(threading.Thread):
                                 if self.check_death_dialog():
                                     player_alive = False
                                 self.proceed_to_next_stage()
+                        elif not monster_has_been_alive and player_alive and not monster_alive:
+                            self.log("Checking stage timer.", "info")
+                            elapsed_time = time.time() - stage_timer
+                            # If 3 seconds has passed, then we can determine that the monster won't spawn bc it's killed.
+                            if elapsed_time > 3:
+                                monster_has_been_alive = True
+                                self.proceed_to_next_stage()
+                            
                 elif current_stage == self.configuration['stage_limit'] + 1:
                     self.log("Maximum stage reached. Exiting run!", "info")
                     self.exit_dojo_run()
@@ -194,6 +205,7 @@ class DojoBot(threading.Thread):
         global prev_attack_direction
         global current_stage
         global prev_stage
+        self.run_stats['bursted_stages'] = []
         prev_attack_direction = ""
         player_alive = True
         current_stage = -3
@@ -216,6 +228,9 @@ class DojoBot(threading.Thread):
             pd.press('down')
             time.sleep(0.5)
             pd.press('enter', presses=4, interval=1)
+            # TODO: Check if someone is inside!
+            if self.is_dojo_occupied():
+                self.change_channel()
             # Reset run
             self.reset_run()
         else:
@@ -227,6 +242,46 @@ class DojoBot(threading.Thread):
         for buff in self.configuration['buff_keys']:
             pd.press(buff)
             time.sleep(1.5)
+
+    def is_dojo_occupied(self):
+        """ Checks if someone is already inside dojo. """
+
+        player_inside = pg.locateOnScreen('images/occupied_dojo.png', confidence=0.9, region=MAPLE_REGION)
+        if player_inside:
+            logger.info("Player is inside!")
+            return True
+        else:
+            logger.info("Player is not inside!")
+            return False
+
+    def change_channel(self):
+        """ Changes channel. """
+        # Closing dialog first
+        pg.press("escape", presses=1)
+        # Finding settings button location
+        settings_button = pg.locateOnScreen('images/settings_btn.png', confidence = 0.9, region=MAPLE_REGION)
+        if settings_button:
+            # Getting centered point and clicking the button
+            pg.click(pg.center(settings_button))
+            global current_channel
+            self.log("Changing channels.", "info")
+            pg.press("Enter")
+            channel_skip = 1
+            # Maximum channel is 10
+            if current_channel == 10:
+                # Decrementing channels randomly from 1 to 9.
+                channel_skip = random.randint(1,9)
+                # Navigating channel menu
+                pg.press("Left", presses=channel_skip, interval = 0.5)
+                current_channel -= channel_skip
+            else:
+                current_channel += 1
+                pg.press("Right", presses=channel_skip, interval=0.5)
+            # Joining channel by pressing enter
+            pg.press("Enter")
+            time.sleep(2)
+        else:
+            self.log("Settings button not found. Retrying shortly.", "info")
 
 
     def exit_dojo_run(self):
@@ -282,7 +337,8 @@ class DojoBot(threading.Thread):
 
     def proceed_to_next_stage(self, exit_stage=False):
         """ Transports player to next level. """
-
+        # Turn right
+        pd.press("right", presses = 2)
         # Perform teleport to right corner.
         with pg.hold('right'):
             pd.press('c', presses = 3, interval = 0.8)
@@ -330,11 +386,11 @@ class DojoBot(threading.Thread):
             self.log("Monster tag image is missing.", "error")
             return False
     
-    def perform_basic_attack(self, duration):
+    def perform_basic_attack(self):
         """ Performs attack.  """
-
         # If stage is hard, use burst first.
-        if current_stage in self.configuration['burst_stages']:
+        if current_stage in self.configuration['burst_stages'] and current_stage not in self.run_stats['bursted_stages']:
+            logger.info("Performing burst attack.")
             # Using burst buffs, if given.
             if 'burst_buff_keys' in self.configuration:
                 pd.press(self.configuration['burst_buff_keys'], interval=1)
@@ -348,6 +404,7 @@ class DojoBot(threading.Thread):
                 pd.press(self.configuration['burst_att_key'],
                          presses = self.configuration['burst_dur'],
                          interval=1)
+            self.run_stats['bursted_stages'].append(current_stage)
             # Returning true instead of attacking, since monster is probs dead.
             return True
         # Normal attack with the user chosen mode
@@ -386,6 +443,8 @@ class DojoBot(threading.Thread):
         """ Takes a screenshot of map name. """
         image_name = self.gui.generate_stage_image_name()
         pg.screenshot("images/" + image_name, region = MAP_NAME_REGION)
+        # This is used to take any needed images from maple region.
+        pg.screenshot("images/temp.png", region = MAPLE_REGION)
         self.gui.show_stage_image()
 
     def detect_map_name_bar(self):

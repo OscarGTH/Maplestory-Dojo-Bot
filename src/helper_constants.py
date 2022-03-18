@@ -25,4 +25,4 @@ KEY_LIST = ['\t', '\n', '\r', ' ', '!', '"', '#', '$', '%', '&', "'", '(',
 'command', 'option', 'optionleft', 'optionright']
 SCREENSHOT_GUIDE_TEXT = "To detect a map, a screenshot of minimap name has to be taken for each map. Choose the current map you're in and press 'Take screenshot' button to take the image. Repeat this action for every stage you want to bot at, including lobby, buff stage and exit stages."
 STAGE_NAMES = ['Dojo lobby', 'Buff stage', 'Exit stage', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33', '34', '35', '36', '37', '38', '39', '40', 'Exit stage']
-IMAGE_NAMES = ['exit_npc', 'lobby_npc','monster_tag', 'death_dialog', 'exit_results_button', 'world_btn']
+IMAGE_NAMES = ['exit_npc', 'lobby_npc','monster_tag', 'death_dialog', 'exit_results_button', 'world_btn', 'settings_btn', 'occupied_dojo']

@@ -47,7 +47,7 @@ class MainApplication(tk.Frame):
         """ Creates and applies styles to various elements. """
 
         # Setting window size
-        self.parent.geometry('%dx%d+%d+%d' % (500, 550, 1250, 300))
+        self.parent.geometry('%dx%d+%d+%d' % (500, 600, 1250, 300))
         # Setting window title
         self.parent.title("DojoBeater")
         # Adding custom cursor
