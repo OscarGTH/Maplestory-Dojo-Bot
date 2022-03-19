@@ -6,22 +6,24 @@ from tkinter import ttk
 from tkinter import filedialog
 from dojobot import DojoBot
 from PIL import ImageTk, Image
-from helper_constants import (
+from helper_functions import (
     KEY_LIST, 
     SCREENSHOT_GUIDE_TEXT,
     STAGE_NAMES,
-    IMAGE_NAMES
+    IMAGE_NAMES,
+    STATISTICS_COLUMNS
 )
 app = ""
 fontlight = ('Trebuchet MS', '9', 'normal roman')
 fontbold = ('Trebuchet MS', '9', 'bold roman')
 settings_tab_rows = {"stage_limit": 1, "run_limit": 2,
-                     "main_att_key": 3, "main_att_type": 4, 
-                     "main_dur": 5, "burst_stages": 6,
-                     "burst_buff_keys": 7, "burst_att_key": 8,
-                     "burst_att_type": 9, "burst_dur": 10,
-                     "potion_keys": 11, "buff_keys": 12,
-                     "stage_walk": 13, "exit_walk": 14
+                     "channel_run_limit": 3, "channel_start": 4,
+                     "main_att_key": 5, "main_att_type": 6, 
+                     "main_dur": 7, "burst_stages": 8,
+                     "burst_buff_keys": 9, "burst_att_key": 10,
+                     "burst_att_type": 11, "burst_dur": 12,
+                     "potion_keys": 13, "buff_keys": 14,
+                     "stage_walk": 15, "exit_walk": 16
                     }
 row_padding = 3
 
@@ -47,7 +49,7 @@ class MainApplication(tk.Frame):
         """ Creates and applies styles to various elements. """
 
         # Setting window size
-        self.parent.geometry('%dx%d+%d+%d' % (500, 600, 1250, 300))
+        self.parent.geometry('%dx%d+%d+%d' % (500, 620, 1370, 300))
         # Setting window title
         self.parent.title("DojoBeater")
         # Adding custom cursor
@@ -135,11 +137,32 @@ class MainApplication(tk.Frame):
                                     pady = 20,
                                     padx = 10,
                                     sticky = tk.W)
-        canvas = tk.Canvas(main_tab, width = 200, height = 150)
-        canvas.create_rectangle(2,2, 200, 150, fill = 'white')
-        canvas.grid(column = 0, row = 3, padx = 10, sticky = tk.W)
-        self.statistics_canvas = canvas
-        
+        stat_canvas = tk.Canvas(main_tab, width = 100, height = 250)
+        stat_canvas.grid(column = 0, row = 3, padx = 10, sticky = tk.W)
+
+        ####
+        # Main tab statistics tree view
+        ####
+        # Defining columns
+        stat_columns = ("desc", "value")
+        # Creating TreeView object
+        stat_tree = ttk.Treeview(stat_canvas, columns=stat_columns, show='headings')
+        # Setting headings
+        stat_tree.heading("desc", text="Item")
+        stat_tree.heading("value", text="Value")
+        # Setting constraints to headings and columns
+        stat_tree.column("desc", anchor="w", minwidth=0, width=130, stretch=tk.NO)
+        stat_tree.column("value", anchor="w", minwidth=0, width=85, stretch=tk.NO)
+
+        # Inserting Items
+        for key_val in STATISTICS_COLUMNS.keys():
+            # Putting key into array
+            packed_val = [key_val, '---']
+            # Inserting column value into treeview
+            stat_tree.insert('', tk.END, values=packed_val)
+        stat_tree.grid(row=0, column=0, sticky='w')
+        self.statistics_tree = stat_tree
+
         ####
         # Main tab bot status
         ####
@@ -177,7 +200,7 @@ class MainApplication(tk.Frame):
                               pady = row_padding, sticky = tk.W)
         ##################
 
-        # Run count limit
+        # Total run count limit
         ttk.Label(settings_tab, text = "Run count limit:", name = "run_limit_lbl",
                   justify = tk.LEFT, anchor = "w").grid(column = 0,
                                                         row = settings_tab_rows["run_limit"],
@@ -186,6 +209,30 @@ class MainApplication(tk.Frame):
         count_limit = ttk.Entry(settings_tab, width = 4, font = fontlight, name = "run_limit",
                                 validate="key", validatecommand = self.conf_changed)
         count_limit.grid(column = 1, row = settings_tab_rows["run_limit"],
+                         pady = row_padding, sticky = tk.W)
+        ##################
+
+        # Run count per channel limit
+        ttk.Label(settings_tab, text = "Channel run limit:", name = "channel_run_limit_lbl",
+                  justify = tk.LEFT, anchor = "w").grid(column = 0,
+                                                        row = settings_tab_rows["channel_run_limit"],
+                                                        sticky = tk.W,
+                                                        padx = 5)
+        count_limit = ttk.Entry(settings_tab, width = 4, font = fontlight, name = "channel_run_limit",
+                                validate="key", validatecommand = self.conf_changed)
+        count_limit.grid(column = 1, row = settings_tab_rows["channel_run_limit"],
+                         pady = row_padding, sticky = tk.W)
+        ##################
+
+        # Starting channel
+        ttk.Label(settings_tab, text = "Starting channel:", name = "channel_start_lbl",
+                  justify = tk.LEFT, anchor = "w").grid(column = 0,
+                                                        row = settings_tab_rows["channel_start"],
+                                                        sticky = tk.W,
+                                                        padx = 5)
+        count_limit = ttk.Entry(settings_tab, width = 4, font = fontlight, name = "channel_start",
+                                validate="key", validatecommand = self.conf_changed)
+        count_limit.grid(column = 1, row = settings_tab_rows["channel_start"],
                          pady = row_padding, sticky = tk.W)
         ##################
         
@@ -563,9 +610,15 @@ class MainApplication(tk.Frame):
                 # Removing old configuration file to make sure overwriting is successful.
                 if os.path.exists(file_name):
                     os.remove(file_name)
+
+                # Making a copy of configuration, because one field has to be excluded.
+                modified_conf = dict(self.configuration)
+                # Removing channel start information
+                del modified_conf['channel_start']
+
                 # Writing dictionary into JSON file.
                 with open(file_name, 'w') as f:
-                    json.dump(self.configuration, f, indent=4, sort_keys=True)
+                    json.dump(modified_conf, f, indent=4, sort_keys=True)
                 self.check_configuration()
             else:
                 # Setting config name error
@@ -666,6 +719,28 @@ class MainApplication(tk.Frame):
                                     self.configuration['run_limit'] = int(value)
                             except ValueError:
                                 invalid_elems.append(child)
+                    case "channel_run_limit":
+                        if len(stripped_value):
+                            try:
+                                if int(value) < 0:
+                                    raise ValueError
+                                else:
+                                    self.configuration['channel_run_limit'] = int(value)
+                            except ValueError:
+                                invalid_elems.append(child)
+                    case "channel_start":
+                        if len(stripped_value):
+                            try:
+                                # Channel has to be from 1 to 10.
+                                if int(value) <= 0 or int(value) > 10:
+                                    raise ValueError
+                                else:
+                                    self.configuration['channel_start'] = int(value)
+                            except ValueError:
+                                invalid_elems.append(child)
+                        else:
+                            # Value is required, so if it is empty, it's also invalid.
+                            invalid_elems.append(child)
                     case "main_att_key":
                         if value not in KEY_LIST:
                             invalid_elems.append(child)
@@ -755,6 +830,8 @@ class MainApplication(tk.Frame):
 
         if not invalid_elems:
             self.valid_conf = True
+            # Resetting statistical value table
+            self.reset_stats()
             return True
         else:
             for elem in invalid_elems:
@@ -832,6 +909,41 @@ class MainApplication(tk.Frame):
         self.status_canvas.create_text(5, y_pos, anchor="nw", tags="message",
                                            text = message, fill="black",
                                            font=('Helvetica 8 normal'))
+    
+    def update_stats(self, stat_key, stat_value):
+        """ Updates statistical values into TreeView. 
+            param::stat_key
+                Key of statistical value, same as dict keys in STATISTICS_COLUMNS
+            param::stat_value
+                Measured statistical value
+        """
+
+        s_tree = self.statistics_tree
+        # Getting statistics TreeView children
+        children = s_tree.get_children()
+        # Looping over children
+        for child in children:
+            # Getting data of child
+            stat_item = s_tree.item(child)
+            # Matching value to be updated
+            if stat_item['values'][0] == stat_key:
+                # Deleting previous value
+                s_tree.delete(child)
+                # Setting updated values
+                updated_values = [stat_item['values'][0], stat_value]
+                # Inserting values into tree
+                s_tree.insert('', STATISTICS_COLUMNS[stat_key], values = updated_values)
+
+    def reset_stats(self):
+        """ Resets statistical values on the treeview. """
+
+        s_tree = self.statistics_tree
+        for index, child in enumerate(s_tree.get_children()):
+            stat_item = s_tree.item(child)
+            s_tree.delete(child)
+            updated_values = [stat_item['values'][0], '---']
+            s_tree.insert('', index, values = updated_values)
+
     def process_queue(self):
         try:
             msg = self.queue.get_nowait()

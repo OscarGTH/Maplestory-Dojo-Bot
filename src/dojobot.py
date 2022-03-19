@@ -1,3 +1,4 @@
+from audioop import avg
 import os
 import random
 import ctypes
@@ -9,13 +10,19 @@ import time
 import datetime
 import pygetwindow as gw
 from logzero import logger
+from helper_functions import (
+    calculate_average_run_time,
+    calculate_pph
+)
 
 # Tuple for setting the region where map name should be detected from.
 # Values are left, top, width, height in order.
-MAP_NAME_REGION = (0, 30, 320, 35)
+MAP_NAME_REGION = (0, 0, 0, 0)
 # Maple window region
 MAPLE_REGION = ()
 MONSTER_HP_REGION = ()
+# Contains location of settings button after it's been found once using image detection.
+SETTINGS_BTN_LOC = None
 # Variable to mark current_stage the player is in.
 # (-2 for exit stage, -1 for main lobby, 0 for buff lobby)
 current_stage = -3
@@ -27,7 +34,6 @@ prev_attack_direction = ""
 # Used to contain the run start time in UNIX format
 start_time = 0
 run_time = 0
-current_channel = 1
 
 class DojoBot(threading.Thread):
 
@@ -39,13 +45,18 @@ class DojoBot(threading.Thread):
             if not self.sc_mode:
                 self.configuration = master.configuration
                 self.set_up_conf()
-                self.run_stats = {'reached_end': False, 'run_count': 0, 'bursted_stages': []}
+                self.run_stats = {'reached_end': False, 'run_count': 0, 
+                                  'current_channel': self.configuration['channel_start'],
+                                  'channel_run_count': 0, 'bursted_stages': [], 'death_count': 0,
+                                  'all_run_times': [], 'npc_not_found_count': 0, 'highest_pph': 0}
                 
     def set_up_conf(self):
         """ Checks configuration and sets values to default if they're missing. """
 
         if "stage_limit" not in self.configuration:
             self.configuration['stage_limit'] = 80
+        if "channel_run_limit" not in self.configuration:
+            self.configuration['channel_run_limit'] = 20
         if "run_limit" not in self.configuration:
             self.configuration['run_limit'] = 10000
         if "burst_stages" not in self.configuration:
@@ -78,6 +89,7 @@ class DojoBot(threading.Thread):
 
     def do_dojo_run(self):
         """ Handles main logic of botting run. """
+
         self.log("Beginning botting actions.", "info")
         monster_has_been_alive = False
         stage_timer = 0
@@ -132,6 +144,8 @@ class DojoBot(threading.Thread):
                                 if self.check_death_dialog():
                                     player_alive = False
                                 self.proceed_to_next_stage()
+                                self.calculate_optimal_stage()
+
                         elif not monster_has_been_alive and player_alive and not monster_alive:
                             self.log("Checking stage timer.", "info")
                             elapsed_time = time.time() - stage_timer
@@ -157,12 +171,22 @@ class DojoBot(threading.Thread):
                 elif current_stage == -1:
                     # Only incrementing run count, if bot had reached end.
                     if self.run_stats['reached_end'] == True:
+                        # Incrementing total run count and channel specific run count
                         self.run_stats['run_count'] += 1
+                        self.run_stats['channel_run_count'] += 1
+                        # Updating stats to GUI
+                        self.gui.update_stats("Run count", self.run_stats['run_count'])
+                        self.gui.update_stats("Channel run count", self.run_stats['channel_run_count'])
+                        # Turning flag variable
                         self.run_stats['reached_end'] = False
                     # If run limit is lower or equal to run count, bot needs to be stopped.
                     if self.configuration['run_limit'] <= self.run_stats['run_count']:
                         self.log("Run limit reached. Stopping bot.", "info")
                         self.stop_bot()
+                    # If channel unique run limit has been met, channel change is to be performed.
+                    elif self.configuration['channel_run_limit'] <= self.run_stats['channel_run_count']:
+                        self.log("Channel run limit reached.", "info")
+                        self.change_channel()
                     else:
                         self.log("Starting a run.", "info")
                         self.go_to_dojo()
@@ -171,8 +195,15 @@ class DojoBot(threading.Thread):
                     if self.run_stats['reached_end'] == False:
                         self.log("Run has ended.", "debug")
                         run_time = self.get_run_time()
-                        if run_time != 0:
-                            self.log("Run duration was: " + str(run_time), "info")
+                        if run_time != 0 and player_alive:
+                            self.run_stats['all_run_times'].append(run_time)
+                            # Calculating average run time
+                            avg_run_time = calculate_average_run_time(self.run_stats['all_run_times'])
+                            # Updating run times and estimated points per hour to GUI
+                            self.gui.update_stats("Average run time", str(avg_run_time))
+                            self.gui.update_stats("Estimated pp/h", calculate_pph(avg_run_time, self.configuration['stage_limit']))
+                            self.gui.update_stats("Best run time", str(min(self.run_stats['all_run_times'])))
+                            self.gui.update_stats("Last run time", str(run_time))
                         # Marking the run finished.
                         self.run_stats['reached_end'] = True
                         self.close_result_dialog()
@@ -197,6 +228,23 @@ class DojoBot(threading.Thread):
             return 0
         else:
             return formatted_time
+
+    def calculate_optimal_stage(self):
+        """ Calculates optimal stage limit based on current stage and current time. """
+
+        # Getting run time after every stage
+        run_time = self.get_run_time()
+        if run_time != 0:
+            current_pph = calculate_pph(run_time, current_stage)
+            if current_pph > self.run_stats['highest_pph']:
+                # Setting current pph as the highest pph achieved
+                self.run_stats['highest_pph'] = current_pph
+                gui_text = str(current_stage + 1) + " (" + str(current_pph) + ")"
+                # Updating to gui
+                self.gui.update_stats("Sugg. exit stage", gui_text)
+        else:
+            logger.info("Cannot calculate pph for current stage.")
+
 
     def reset_run(self):
         """ Resets some important variables when run has ended. """
@@ -228,13 +276,22 @@ class DojoBot(threading.Thread):
             pd.press('down')
             time.sleep(0.5)
             pd.press('enter', presses=4, interval=1)
-            # TODO: Check if someone is inside!
+            # Checking if dojo is occupied (someone is already inside)
             if self.is_dojo_occupied():
+                # Performing channel change
                 self.change_channel()
-            # Reset run
-            self.reset_run()
+            else:
+                # Reset run
+                self.reset_run()
         else:
             self.log("Dojo NPC couldn't be found.", "debug")
+            # Moving mouse out of the way
+            self.sync_mouse()
+            self.run_stats['npc_not_found_count'] += 1
+            # Changing channels after 4 failed attempts.
+            if self.run_stats['npc_not_found_count'] >= 4:
+                self.change_channel()
+                self.run_stats['npc_not_found_count'] = 0
 
     def buff_character(self):
         """ Buffs up before dojo run. """
@@ -246,42 +303,61 @@ class DojoBot(threading.Thread):
     def is_dojo_occupied(self):
         """ Checks if someone is already inside dojo. """
 
+        # Locating dialog, which tells if player is inside dojo.
         player_inside = pg.locateOnScreen('images/occupied_dojo.png', confidence=0.9, region=MAPLE_REGION)
         if player_inside:
-            logger.info("Player is inside!")
+            self.log("Dojo is occupied.", "info")
             return True
         else:
-            logger.info("Player is not inside!")
+            self.log("Dojo is not occupied.", "info")
             return False
 
     def change_channel(self):
         """ Changes channel. """
+
+        global SETTINGS_BTN_LOC
         # Closing dialog first
         pg.press("escape", presses=1)
-        # Finding settings button location
-        settings_button = pg.locateOnScreen('images/settings_btn.png', confidence = 0.9, region=MAPLE_REGION)
-        if settings_button:
+        # If location of settings button has not been set yet, use img. detection to find it once.
+        if SETTINGS_BTN_LOC == None:
+            self.log("Detecting settings button.", "info")
+            # Finding settings button location
+            settings_button = pg.locateOnScreen('images/settings_btn.png', confidence = 0.9, region=MAPLE_REGION)
+            # If button was found, set constant value as the center of the button.
+            if settings_button:
+                self.log("Settings button location saved.", "info")
+                SETTINGS_BTN_LOC = pg.center(settings_button)
+
+        # If settings button location is known, continue.
+        if SETTINGS_BTN_LOC:
             # Getting centered point and clicking the button
-            pg.click(pg.center(settings_button))
-            global current_channel
+            pg.click(SETTINGS_BTN_LOC)
             self.log("Changing channels.", "info")
             pg.press("Enter")
+            time.sleep(0.5)
             channel_skip = 1
             # Maximum channel is 10
-            if current_channel == 10:
+            if self.run_stats['current_channel'] == 10:
                 # Decrementing channels randomly from 1 to 9.
                 channel_skip = random.randint(1,9)
                 # Navigating channel menu
                 pg.press("Left", presses=channel_skip, interval = 0.5)
-                current_channel -= channel_skip
+                self.run_stats['current_channel'] -= channel_skip
             else:
-                current_channel += 1
+                self.run_stats['current_channel'] += 1
                 pg.press("Right", presses=channel_skip, interval=0.5)
             # Joining channel by pressing enter
             pg.press("Enter")
-            time.sleep(2)
+            time.sleep(2.5)
+            # Reseting channel run count.
+            self.run_stats['channel_run_count'] = 0
+            # Updating statistics.
+            self.gui.update_stats("Channel run count", 0)
+            self.gui.update_stats("Current channel", self.run_stats['current_channel'])
         else:
             self.log("Settings button not found. Retrying shortly.", "info")
+            # Moving mouse out of the way
+            self.sync_mouse()
 
 
     def exit_dojo_run(self):
@@ -301,6 +377,8 @@ class DojoBot(threading.Thread):
             pd.press('enter')
         else:
             self.log("Can't locate exit npc.", "warning")
+            # Moving mouse out of the way if that is the issue
+            self.sync_mouse()
 
     def walk_to_attack_position(self):
         """ Walks a bit forward in the beginning of each stage. """
@@ -435,9 +513,12 @@ class DojoBot(threading.Thread):
             dd_coords = pg.center(dd)
             # Clicking OK button to respawn.
             pg.click(dd_coords)
+            self.run_stats['death_count'] += 1
+            self.gui.update_stats("Death count", self.run_stats['death_count'])
             return True
         else:
             return False
+
 
     def take_screenshot(self):
         """ Takes a screenshot of map name. """
@@ -461,6 +542,7 @@ class DojoBot(threading.Thread):
                 return True
             else:
                 self.log("Could not find world button.", "debug")
+                self.sync_mouse()
                 return False
         except ValueError:
             return False
@@ -473,7 +555,8 @@ class DojoBot(threading.Thread):
             self.log("Detecting current stage...", "debug")
             for stage in range(-2, self.configuration['stage_limit'] + 2):
                 if pg.locateOnScreen('images/stage_' + str(stage) + '.png', grayscale=True, region = MAP_NAME_REGION):
-                    self.log("Detected stage: " + str(stage), "debug")
+                    logger.info("Detected stage: " + str(stage))
+                    self.gui.update_stats("Current stage", stage)
                     global current_stage
                     global prev_stage
                     prev_stage = current_stage
@@ -508,7 +591,10 @@ class DojoBot(threading.Thread):
             else:
                 self.stop_bot()
                     
-            
+    def sync_mouse(self):
+        """ Moves mouse cursor into a place where it is not in front of any item. """
+
+        pg.moveTo(MAPLE_REGION[0] + 15, MAPLE_REGION[1] + 15)
 
     def log(self, msg, msg_type):
         """ Logs message to command line and GUI. """
