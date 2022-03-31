@@ -298,7 +298,7 @@ class DojoBot(threading.Thread):
 
         for buff in self.configuration['buff_keys']:
             pd.press(buff)
-            time.sleep(1.5)
+            time.sleep(1)
 
     def is_dojo_occupied(self):
         """ Checks if someone is already inside dojo. """
@@ -413,6 +413,7 @@ class DojoBot(threading.Thread):
                 # If match wasn't found, then monster still has hp.
                 return True
         else:
+            logger.info("Finding monster hp bar coords again.")
             # Run had been started later than 0 stage, so region had not been initialized.
             # Doing it now.
             self.find_monster_hp_bar_coords()
@@ -437,6 +438,7 @@ class DojoBot(threading.Thread):
         # Reset attack position
         global prev_attack_direction
         prev_attack_direction = ''
+        time.sleep(0.5)
 
     def rotate_character(self):
         """ Repositions the character and finds the monster """
