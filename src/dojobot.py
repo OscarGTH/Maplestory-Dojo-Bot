@@ -404,14 +404,18 @@ class DojoBot(threading.Thread):
 
     def monster_is_alive(self):
         """ Checks if monster HP bar is found. """
-
-        monster_hp_bar = pg.locateOnScreen("images/monster_hp_bar.png", region=MONSTER_HP_REGION)
-        if monster_hp_bar:
-            # If hp bar matched an empty hp bar, then the monster is dead as dead fish.
-            return False
+        if MONSTER_HP_REGION != ():
+            monster_hp_bar = pg.locateOnScreen("images/monster_hp_bar.png", region=MONSTER_HP_REGION)
+            if monster_hp_bar:
+                # If hp bar matched an empty hp bar, then the monster is dead as dead fish.
+                return False
+            else:
+                # If match wasn't found, then monster still has hp.
+                return True
         else:
-            # If match wasn't found, then monster still has hp.
-            return True
+            # Run had been started later than 0 stage, so region had not been initialized.
+            # Doing it now.
+            self.find_monster_hp_bar_coords()
 
     def proceed_to_next_stage(self, exit_stage=False):
         """ Transports player to next level. """
@@ -471,7 +475,10 @@ class DojoBot(threading.Thread):
             logger.info("Performing burst attack.")
             # Using burst buffs, if given.
             if 'burst_buff_keys' in self.configuration:
-                pd.press(self.configuration['burst_buff_keys'], interval=1)
+                # Iterating over buff keys and pressing them one at a time.
+                for key in self.configuration['burst_buff_keys']:
+                    pd.press(key)
+                    time.sleep(0.8)
             if self.configuration['burst_att_type'] == "Press once":
                 pd.press(self.configuration['burst_att_key'])
             elif self.configuration['burst_att_type'] == 'Hold':
@@ -485,24 +492,43 @@ class DojoBot(threading.Thread):
             self.run_stats['bursted_stages'].append(current_stage)
             # Returning true instead of attacking, since monster is probs dead.
             return True
+
         # Normal attack with the user chosen mode
         if self.configuration['main_att_type'] == 'Hold':
-            pd.press('right')
-            pd.keyDown(self.configuration['main_att_key'])
-            time.sleep(round(self.configuration['main_dur'] / 2))
-            pd.keyUp(self.configuration['main_att_key'])
-
-            pd.press('left')
-            pd.keyDown(self.configuration['main_att_key'])
-            time.sleep(round(self.configuration['main_dur'] / 2))
-            pd.keyUp(self.configuration['main_att_key'])
+            # If attacking has to be done to both directions, split duration.
+            if self.configuration['both_directions'] == True:
+                # Splitting duration in half
+                duration = round(self.configuration['main_dur'] / 2)
+                self.hold_attack('right', duration, self.configuration['main_att_key'])
+                self.hold_attack('left', duration, self.configuration['main_att_key'])
+                # Turning back right
+                pd.press('right')
+            else:
+                # Attacking right for the whole duration
+                self.hold_attack('right', self.configuration['main_dur'], self.configuration['main_att_key'])
         else:
-            pd.press(self.configuration['main_att_key'], presses=5)
-            time.sleep(0.4)
-            pd.press('left')
-            pd.press(self.configuration['main_att_key'], presses=5)
-            time.sleep(0.4)
-            pd.press('right')
+            # Attacking right first
+            self.press_attack('right', self.configuration['main_att_key'])
+            if self.configuration['both_directions'] == True:
+                # Attacking left if needed
+                self.press_attack('left', self.configuration['main_att_key'])
+                # Turn to right again.
+                pd.press('right')
+
+
+    def hold_attack(self, direction, duration, key):
+        ''' Attacks to given direction by holding down the attack key for given duration. '''
+
+        pd.press(direction)
+        pd.keyDown(key)
+        time.sleep(duration)
+        pd.keyUp(key)
+
+    def press_attack(self, direction, key):
+        ''' Attacks to the given direction by pressing the attack repeatedly. '''
+
+        pd.press(direction)
+        pd.press(key, presses=3, interval=0.2)
 
     def check_death_dialog(self):
         """ Checks if death dialog is displayed in case character dies. """

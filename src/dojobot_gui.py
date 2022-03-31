@@ -19,11 +19,11 @@ fontbold = ('Trebuchet MS', '9', 'bold roman')
 settings_tab_rows = {"stage_limit": 1, "run_limit": 2,
                      "channel_run_limit": 3, "channel_start": 4,
                      "main_att_key": 5, "main_att_type": 6, 
-                     "main_dur": 7, "burst_stages": 8,
-                     "burst_buff_keys": 9, "burst_att_key": 10,
-                     "burst_att_type": 11, "burst_dur": 12,
-                     "potion_keys": 13, "buff_keys": 14,
-                     "stage_walk": 15, "exit_walk": 16
+                     "main_dur": 7, "both_directions": 8, "burst_stages": 9,
+                     "burst_buff_keys": 10, "burst_att_key": 11,
+                     "burst_att_type": 12, "burst_dur": 13,
+                     "potion_keys": 14, "buff_keys": 15,
+                     "stage_walk": 16, "exit_walk": 17
                     }
 row_padding = 3
 
@@ -49,7 +49,7 @@ class MainApplication(tk.Frame):
         """ Creates and applies styles to various elements. """
 
         # Setting window size
-        self.parent.geometry('%dx%d+%d+%d' % (500, 620, 1370, 300))
+        self.parent.geometry('%dx%d+%d+%d' % (520, 645, 1370, 300))
         # Setting window title
         self.parent.title("DojoBeater")
         # Adding custom cursor
@@ -263,7 +263,23 @@ class MainApplication(tk.Frame):
         main_att_dd.grid(column = 1, row = settings_tab_rows["main_att_type"],
                          pady = row_padding, sticky = tk.W)
         ##################
-        
+
+        # Main attack direction (Right and Left/Only Right)
+        ttk.Label(settings_tab, text = "Att. both directions:", name = "both_directions_lbl",
+                  justify=tk.LEFT, anchor = "w").grid(column = 0, row = settings_tab_rows["both_directions"],
+                                     sticky = tk.W, padx = 5)
+        self.both_directions = tk.BooleanVar()
+        self.both_directions.set(True)
+        ttk.Checkbutton(settings_tab,
+                        variable=self.both_directions,
+                        onvalue=True,
+                        takefocus=False,
+                        offvalue=False).grid(column=1,
+                                             row = settings_tab_rows["both_directions"],
+                                             pady = row_padding,
+                                             sticky=tk.W)
+        #####################
+
         # Burst stages
         ttk.Label(settings_tab, text = "Burst stages:", name = "burst_stages_lbl",
                   justify = tk.LEFT, anchor = "w").grid(column = 0,
@@ -641,6 +657,8 @@ class MainApplication(tk.Frame):
                 # Setting values that always exist.
                 self.burst_att_var.set(self.configuration['burst_att_type'])
                 self.main_att_var.set(self.configuration['main_att_type'])
+                if 'both_directions' in self.configuration:
+                    self.both_directions.set(self.configuration['both_directions'])
 
                 # Deleting all previous values.
                 for child in settings_tab.winfo_children():
@@ -748,10 +766,10 @@ class MainApplication(tk.Frame):
                             self.configuration['main_att_key'] = value
                     case "main_dur":
                         try:
-                            if self.main_att_var.get() == "Hold" and int(value) < 0:
+                            if self.main_att_var.get() == "Hold" and float(value) < 0:
                                 raise ValueError
                             else:
-                                self.configuration['main_dur'] = int(value)
+                                self.configuration['main_dur'] = float(value)
                         except ValueError:
                             invalid_elems.append(child)
                     case "burst_stages":
@@ -824,9 +842,12 @@ class MainApplication(tk.Frame):
                                 self.configuration['exit_walk'] = float(value)
                         except ValueError:
                             invalid_elems.append(child)
+            # Handling elements that are not descendants of ttk.Entry
             elif isinstance(child, ttk.OptionMenu):
                 self.configuration['main_att_type'] = self.main_att_var.get()
                 self.configuration['burst_att_type'] = self.burst_att_var.get()
+            elif isinstance(child, ttk.Checkbutton):
+                self.configuration['both_directions'] = self.both_directions.get()
 
         if not invalid_elems:
             self.valid_conf = True

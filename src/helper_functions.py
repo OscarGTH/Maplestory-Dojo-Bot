@@ -39,7 +39,7 @@ STATISTICS_COLUMNS = {"Run count": 0, "Channel run count": 1,
 STAGE_POINTS = [10, 20, 30, 40, 50, 60, 70,
                 80, 90, 190, 210, 230, 250,
                 270, 290, 310, 330, 350, 370,
-                570, 610, 650, 690, 730, 770]
+                570, 610, 650, 690, 730, 770, 810, 850, 890, 930]
 
 def calculate_pph(avg_run_time, stage_limit):
     """ Calculates the estimated points per hour. """
