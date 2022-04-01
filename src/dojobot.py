@@ -1,4 +1,3 @@
-from audioop import avg
 import os
 import random
 import ctypes
