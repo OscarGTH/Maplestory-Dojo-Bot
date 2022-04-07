@@ -5,11 +5,11 @@ This bot is made to be used in the Mu Lung Dojo content and it does not work any
 Maplestory version for which this bot was developed and tested on is v231.1, but it could work on older or newer versions.
 
 GUI is created with Python GUI library tkInter and the actual bot utilizes automation libraries such as PyDirectInput and PyAutoGui.
-Program can be compiled into an executable by using ex. auto-py-to-exe library or py-installer.
+Program can be compiled into an executable by using libraries like auto-py-to-exe or py-installer.
 
 
 You can compile this program to receive an EXE-file for easier use.
-Execute the command below in the root directory of this project (Replace the "\<PATH TO ROOT DIR\>" with the your own paths.)
+Execute the command below in the root directory of this project (Replace the "\<PATH TO ROOT DIR\>" with your own paths.)
 The path should look something like this: "C:/Users/User/Documents/Maplestory-Dojo-Bot/src/\<FILE NAME\>"
 
 ```console
