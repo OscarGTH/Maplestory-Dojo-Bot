@@ -1,4 +1,4 @@
-# Maplestory-Dojo-Bot
+# Maplestory Dojo Bot
 A botting program for a game called Maplestory. Bot includes an interactive GUI and it does not require any user actions once it has been set up properly.
 
 This bot is made to be used in the Mu Lung Dojo content and it does not work anywhere else.
