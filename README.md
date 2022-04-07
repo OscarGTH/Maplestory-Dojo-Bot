@@ -16,4 +16,13 @@ The path should look something like this: "C:/Users/User/Documents/Maplestory-Do
 pyinstaller --noconfirm --onedir --windowed --icon "<PATH TO ROOT DIR>/icon-png.ico" --uac-admin --add-data "<PATH TO ROOT DIR>/blurrybg.png;." --add-data "<PATH TO ROOT DIR>/icon-png.ico;." --add-data "<PATH TO ROOT DIR>/MapleCursor.ani;." --add-data "<PATH TO ROOT DIR>/MapleCursor_Link.ani;." --add-data "<PATH TO ROOT DIR>/src/dojobot.py;." --add-data "<PATH TO ROOT DIR>/src/helper_functions.py;."  "<PATH TO ROOT DIR>/src/dojobot_gui.py"
 ```
 
-<img src="https://i.imgur.com/z0NqwSe.png" alt="Screenshot of Bot graphical user interface (Main tab is shown)">
+
+# Screenshots of GUI
+## Main tab
+<img style="height:60%;width:60%" src="https://i.imgur.com/z0NqwSe.png" alt="Screenshot of Bot graphical user interface (Main tab is shown)">
+
+## Settings tab
+<img style="height:60%;width:60%" src="https://i.imgur.com/lhMaWTA.png" alt="Screenshot of Bot graphical user interface (Settings tab is shown)">
+
+## Miscellaneous tab
+<img style="height:60%;width:60%" src="https://i.imgur.com/j4fBpbY.png" alt="Screenshot of Bot graphical user interface (Misc tab is shown)">
